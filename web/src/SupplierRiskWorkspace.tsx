@@ -23,9 +23,10 @@ import {
   Sparkles,
   UserCheck,
   UsersRound,
-  X
+  X,
+  type LucideIcon
 } from "lucide-react";
-import type { ComponentType, CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 
 type RiskLevel = "Low" | "Medium" | "High" | "Critical";
@@ -95,7 +96,7 @@ type NotificationItem = {
   time: string;
 };
 
-const views: Array<{ key: ViewKey; label: string; icon: ComponentType<{ size?: number }> }> = [
+const views: Array<{ key: ViewKey; label: string; icon: LucideIcon }> = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
   { key: "intake", label: "Intake", icon: Inbox },
   { key: "documents", label: "Documents", icon: FileSearch },
@@ -528,7 +529,7 @@ function Metric({
   title: string;
   value: string;
   detail: string;
-  icon: ComponentType<{ size?: number }>;
+  icon: LucideIcon;
   tone?: "blue" | "hot" | "amber" | "green";
 }) {
   return (
