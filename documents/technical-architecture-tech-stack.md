@@ -43,15 +43,15 @@ flowchart LR
 | Async Processing | Temporal workers, Celery, BullMQ |
 | LLM Layer | OpenAI models with tool calling, structured outputs, and guardrails |
 | OCR and Document AI | Azure Document Intelligence, AWS Textract, Google Document AI, Tesseract fallback |
-| Transactional Database | PostgreSQL |
-| Vector Search | pgvector, Pinecone, Weaviate, OpenSearch vector search |
+| Transactional Database | SQLite for MVP; PostgreSQL later when concurrency, scale, or deployment needs require it |
+| Vector Search | SQLite FTS or application-level search for MVP; pgvector, Pinecone, Weaviate, or OpenSearch vector search later |
 | Graph Database | Neo4j or Amazon Neptune |
 | Search | OpenSearch / Elasticsearch |
 | Object Storage | S3, Azure Blob Storage, Google Cloud Storage |
 | Rules and Policy Engine | JSONLogic, Drools, Open Policy Agent, custom scoring service |
 | BI and Reporting | Superset, Metabase, Power BI integration |
 | Observability | OpenTelemetry, Prometheus, Grafana, model tracing |
-| Security | SSO, SAML/OIDC, RBAC, encryption, secrets manager, audit logs |
+| Security | Email/password login for MVP, password hashing, RBAC, supplier-scoped visibility, encryption, secrets manager, audit logs; SSO/SAML/OIDC later |
 
 ## Core Services
 
@@ -72,10 +72,32 @@ flowchart LR
 
 | Store | Data |
 |---|---|
-| PostgreSQL | Supplier profiles, users, cases, decisions, scores |
+| SQLite | MVP transactional store for supplier profiles, users, cases, decisions, scores, audit events, evidence metadata, and agent outputs |
 | Object Storage | Raw documents, extracted files, evidence snapshots |
 | Vector Database | Embeddings for document search and semantic retrieval |
 | Graph Database | Supplier relationships, UBO links, parent/subsidiary mapping |
 | Search Index | News, documents, evidence, investigation notes |
 | Event Store | Risk events, score changes, alert history |
 
+## MVP SQLite Guidance
+
+Use SQLite for the first MVP to minimize local setup and infrastructure dependency.
+
+SQLite should be configured with:
+
+```sql
+PRAGMA journal_mode=WAL;
+PRAGMA busy_timeout=5000;
+PRAGMA foreign_keys=ON;
+```
+
+Recommended MVP rules:
+
+- Store the database as a local file, for example `./data/risk_beacon.db`.
+- Use SQLModel or SQLAlchemy so the domain model can migrate to PostgreSQL later.
+- Keep write transactions short.
+- Allow agents to run extraction and enrichment work in parallel, but persist validated outputs through a controlled repository or persistence service.
+- Retry briefly on `database is locked` errors.
+- Do not use SQLite as a shared database file across multiple app servers.
+
+Migration to PostgreSQL should be considered when the product needs multiple app servers, high write concurrency, heavy dashboard workloads, or enterprise-scale audit/event volume.

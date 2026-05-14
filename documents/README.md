@@ -13,9 +13,11 @@ The design is based on the `Semicolon_Apex.docx` concept, especially these produ
 ## Artifacts
 
 - [Application Workflow](./application-workflow.md)
+- [Supplier Onboarding Sequence Flows](./supplier-onboarding-sequence-flows.md)
 - [Roles and Permissions](./roles-and-permissions.md)
 - [Agentic AI Architecture](./agentic-ai-architecture.md)
+- [Agents Workflow Low-Level Design](./agents-workflow.md)
+- [Project Structure and Database Design](./project-structure-and-database-design.md)
 - [Technical Architecture and Tech Stack](./technical-architecture-tech-stack.md)
 - [Risk Dashboard and Notifications](./risk-dashboard-notifications.md)
 - [Feature Roadmap](./feature-roadmap.md)
-

@@ -10,16 +10,16 @@ The architecture documents list several valid options. To keep the first impleme
 
 | Area | Initial Choice | Reason |
 |---|---|---|
-| Frontend | Next.js, TypeScript, Tailwind CSS, shadcn/ui | Fast delivery of a polished workflow UI with strong typing |
+| Frontend | React.js, TypeScript, Tailwind CSS, shadcn/ui | Fast delivery of a polished workflow UI with strong typing |
 | Backend API | Python FastAPI | Good fit for AI workflows, async jobs, OCR integrations, and typed contracts |
-| Database | PostgreSQL | Primary transactional store for suppliers, users, decisions, cases, scores, and audit data |
+| Database | SQLite | Simple MVP transactional store for suppliers, users, decisions, cases, scores, audit data, evidence metadata, and agent outputs |
 | Migrations | Alembic | Versioned database schema changes |
 | Object Storage | S3-compatible storage, MinIO locally | Stores raw documents, extracted files, and evidence snapshots |
 | Background Jobs | Celery or Temporal workers in MVP | Start with durable async processing; use Temporal when workflow durability becomes central |
 | Agent Layer | Specialized service modules with structured outputs | Keeps agent responsibilities clear while avoiding premature distributed complexity |
-| Search and Vector | PostgreSQL first, pgvector later | Defer extra infrastructure until semantic evidence search is needed |
-| Graph | PostgreSQL relationship tables first, Neo4j/Neptune later | MVP needs relationship mapping, not full graph infrastructure on day one |
-| Auth | OIDC-ready app auth with RBAC tables | Supports enterprise SSO later without blocking local development |
+| Search and Vector | SQLite FTS or application-level search first; pgvector later | Defer extra infrastructure until semantic evidence search is needed |
+| Graph | SQLite relationship tables first, Neo4j/Neptune later | MVP needs relationship mapping, not full graph infrastructure on day one |
+| Auth | Email/password login with RBAC tables | Keeps MVP simple; support enterprise SSO later without changing supplier visibility rules |
 | Observability | Structured logs and audit logs first, OpenTelemetry later | Gives traceability immediately and leaves room for production-grade monitoring |
 
 ## Delivery Strategy
@@ -59,7 +59,7 @@ This slice proves the core product loop before adding broader monitoring and adv
   - `apps/web` for Next.js.
   - `apps/api` for FastAPI.
   - `packages/contracts` or shared OpenAPI-generated clients if using a monorepo.
-- Local `docker-compose` for PostgreSQL, object storage, and worker dependencies.
+- Local SQLite database file, plus `docker-compose` only for object storage and worker dependencies when needed.
 - Baseline CI pipeline.
 - Initial OpenAPI contract.
 - Architecture decision record for the selected stack.
@@ -70,6 +70,28 @@ This slice proves the core product loop before adding broader monitoring and adv
 - Health checks pass for frontend, backend, database, and worker.
 - CI runs on every change.
 
+### SQLite MVP Requirements
+
+SQLite is the default database for the MVP. It avoids database server setup, network dependency, Docker dependency for the database, and corporate proxy or Zscaler complications.
+
+Use these settings at application startup:
+
+```sql
+PRAGMA journal_mode=WAL;
+PRAGMA busy_timeout=5000;
+PRAGMA foreign_keys=ON;
+```
+
+Implementation rules:
+
+- Store the database file at `./data/risk_beacon.db` for local development.
+- Use SQLModel or SQLAlchemy with Alembic migrations.
+- Keep the schema relational and portable so PostgreSQL migration remains straightforward.
+- Keep write transactions short.
+- Run agents in parallel for API calls, OCR, extraction, and enrichment, but persist validated outputs through a controlled persistence layer.
+- Add retry handling for transient `database is locked` errors.
+- Do not rely on SQLite for multi-server production deployment.
+
 ## Phase 1: Core Domain, RBAC, and Audit Foundation
 
 **Goal:** Create the platform skeleton that all workflows depend on.
@@ -77,6 +99,8 @@ This slice proves the core product loop before adding broader monitoring and adv
 ### Scope
 
 - User, role, and permission model.
+- Email and password login with secure password hashes.
+- Supplier visibility mapping for buyer and supplier access.
 - Supplier master profile.
 - Supplier onboarding request.
 - Audit log service.
@@ -101,9 +125,11 @@ This slice proves the core product loop before adding broader monitoring and adv
 
 | Entity | Purpose |
 |---|---|
-| User | Authenticated person using the platform |
+| User | Authenticated person using the platform with email/password credentials |
 | Role | Named responsibility bundle |
 | Permission | Granular capability gate |
+| SupplierUserAccess | Maps supplier users to supplier records |
+| BuyerSupplierAccess | Maps buyers to supplier records they can view or manage |
 | Supplier | Supplier master profile |
 | SupplierContact | Supplier contact details |
 | OnboardingRequest | Intake workflow instance |
@@ -114,6 +140,8 @@ This slice proves the core product loop before adding broader monitoring and adv
 
 - Users can be assigned roles.
 - Permissions gate key UI and API actions.
+- Buyers can only see suppliers linked to them through onboarding ownership, buyer-supplier assignment, or explicit supplier access mapping.
+- Supplier users can only see supplier records explicitly linked to them.
 - Supplier records can be created, viewed, edited, and archived.
 - Audit events are written for supplier changes, document actions, score overrides, and decisions.
 
@@ -378,7 +406,7 @@ Start with configurable but deterministic rules:
 
 - Initialize frontend app.
 - Initialize backend API.
-- Add database migrations.
+- Add SQLite database migrations.
 - Add local development services.
 - Add baseline CI.
 - Add shared API contract generation or typed client.
@@ -386,7 +414,9 @@ Start with configurable but deterministic rules:
 ### Identity and Access
 
 - Implement user model.
+- Implement email/password login.
 - Implement roles and permissions.
+- Implement supplier visibility rules for buyers and supplier users.
 - Add route and API authorization guards.
 - Add system administrator role management screens.
 - Add audit middleware or service hooks.
@@ -467,11 +497,13 @@ Start with configurable but deterministic rules:
 
 | Table | Key Fields |
 |---|---|
-| users | id, email, name, status, created_at |
+| users | id, email, password_hash, name, status, created_at |
 | roles | id, name, description |
 | permissions | id, area, action |
 | user_roles | user_id, role_id |
 | role_permissions | role_id, permission_id |
+| supplier_user_access | id, user_id, supplier_id, supplier_contact_id, access_role, status, invited_by, invited_at, accepted_at, revoked_at |
+| buyer_supplier_access | id, user_id, supplier_id, access_level, status, assigned_by, assigned_at, revoked_at |
 | suppliers | id, legal_name, country, tax_id, status, created_at, updated_at |
 | supplier_contacts | id, supplier_id, name, email, phone, role |
 | onboarding_requests | id, supplier_id, requester_id, status, submitted_at, decided_at |
@@ -493,7 +525,7 @@ Start with configurable but deterministic rules:
 
 | Area | Endpoints |
 |---|---|
-| Auth and Users | `GET /me`, `GET /roles`, `POST /users/{id}/roles` |
+| Auth and Users | `POST /auth/login`, `POST /auth/logout`, `GET /me`, `GET /roles`, `POST /users/{id}/roles` |
 | Suppliers | `POST /suppliers`, `GET /suppliers`, `GET /suppliers/{id}`, `PATCH /suppliers/{id}` |
 | Onboarding | `POST /onboarding-requests`, `GET /onboarding-requests`, `POST /onboarding-requests/{id}/submit` |
 | Documents | `POST /suppliers/{id}/documents`, `GET /documents/{id}`, `POST /documents/{id}/replace` |
@@ -511,7 +543,7 @@ Start with configurable but deterministic rules:
 ### Sprint 1: Skeleton and Supplier Foundation
 
 - Create frontend and backend app scaffolds.
-- Add PostgreSQL schema migration setup.
+- Add SQLite schema migration setup.
 - Add user, role, permission, supplier, and audit tables.
 - Build supplier list and supplier detail screens.
 - Add API authorization placeholders.
@@ -537,7 +569,7 @@ Start with configurable but deterministic rules:
 | Workflow state becomes hard to reason about | Use explicit status transitions and audit every transition |
 | Document processing fails silently | Track extraction job state, retries, and visible errors |
 | RBAC is added too late | Build authorization and audit into Phase 1 |
-| Too much infrastructure too early | Start with PostgreSQL-backed relationships and add graph/vector/search infrastructure when justified |
+| Too much infrastructure too early | Start with SQLite-backed relationships and add PostgreSQL, graph, vector, or search infrastructure when justified |
 
 ## Definition of Done for MVP
 
@@ -552,4 +584,3 @@ Start with configurable but deterministic rules:
 - Audit trail captures material user, system, score, document, and decision actions.
 - In-app and email notifications work for the core workflow.
 - Critical path tests pass in CI.
-
