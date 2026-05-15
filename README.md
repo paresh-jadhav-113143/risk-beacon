@@ -48,6 +48,7 @@ auditor@example.com
 - SQLite-backed users, roles, supplier visibility, suppliers, documents, agent runs, risk signals, scores, recommendations, decisions, notifications, and audit events.
 - Buyer-scoped supplier visibility.
 - Supplier-scoped supplier user access.
+- Buyer-created supplier onboarding now creates or links the Supplier Admin user from the supplier contact email. New supplier users use the default MVP password `Password123!`; existing supplier users keep their existing password.
 - Risk Analyst review ownership for compliance, financial, ESG, cyber, operational, reputation, authenticity, and anomaly findings.
 - Agent pipeline scaffold with persisted runs, risk signals, scoring, recommendations, and review queue creation.
 - React dashboard, supplier detail, document metadata entry, assessment execution, and approver decision actions.

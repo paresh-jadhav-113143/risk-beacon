@@ -82,7 +82,7 @@ This is the standard successful onboarding sequence.
 |---:|---|---|---|---|
 | 1 | Procurement Buyer | Buyer logs in with email/password | API validates credentials and loads buyer roles, permissions, and supplier visibility scope | Procurement Buyer |
 | 2 | Procurement Buyer | Buyer creates supplier onboarding request | Create `suppliers`, `onboarding_requests`, audit event, and buyer-supplier access mapping | Procurement Buyer |
-| 3 | Procurement Buyer | Buyer enters initial supplier details and sends invitation | Create supplier contact, invite Supplier Admin, send notification | Supplier Admin |
+| 3 | Procurement Buyer | Buyer enters initial supplier details and sends invitation | Create supplier contact, create or link Supplier Admin user, create supplier-user access mapping, return default login details when a new supplier user is created, send notification | Supplier Admin |
 | 4 | Supplier Admin | Supplier Admin logs in with email/password | API validates supplier user and supplier access mapping | Supplier Admin |
 | 5 | Supplier Admin | Supplier completes supplier profile | Save profile fields, update onboarding request, write audit event | Supplier Admin |
 | 6 | Supplier Admin | Supplier uploads required documents | Store files in object storage, save document metadata, create audit events | Document Intelligence Agent |
@@ -156,10 +156,40 @@ System actions:
 - Creates onboarding request in `draft` status.
 - Creates buyer visibility mapping in `buyer_supplier_access`.
 - Creates supplier contact record.
+- Creates a Supplier Admin user when the supplier contact email does not already exist.
+- Assigns the `Supplier Admin` role in `user_roles`.
+- Creates supplier visibility mapping in `supplier_user_access`.
 - Sends invitation to supplier contact.
+- Returns supplier login details in the create onboarding response for newly created supplier users.
+- If the supplier contact email already exists, links the existing user to the supplier and does not expose or reset the existing password.
 - Writes audit events.
 
 Next owner: Supplier Admin
+
+Supplier invitation response contract:
+
+```json
+{
+  "supplier_id": "SUP-12345678",
+  "invitation": {
+    "status": "created",
+    "supplier_user_id": "USR-1234567890",
+    "email": "supplier.admin@example.com",
+    "role": "Supplier Admin",
+    "supplier_id": "SUP-12345678",
+    "login_url": "/auth/login",
+    "password_delivery": "default_password",
+    "default_password": "Password123!"
+  }
+}
+```
+
+Supplier login rules:
+
+- New supplier users log in with the supplier contact email and the default password `Password123!`.
+- The default password is only stored as a password hash in the database.
+- Existing supplier users continue using their existing password.
+- Supplier visibility is always enforced through `supplier_user_access`; a Supplier Admin can only open supplier records explicitly mapped to their user.
 
 ### 2. Supplier Completes Profile
 
@@ -602,6 +632,7 @@ Every material step should emit an audit event.
 |---|---|
 | Login | `auth.login_succeeded`, `auth.login_failed` |
 | Buyer onboarding | `onboarding.created`, `supplier.created`, `supplier_access.buyer_assigned` |
+| Supplier invitation | `supplier.invitation_sent` |
 | Supplier profile | `supplier.profile_updated`, `supplier.profile_submitted` |
 | Documents | `document.uploaded`, `document.replaced`, `document.extraction_completed` |
 | Agents | `agent.run_started`, `agent.run_completed`, `agent.run_failed` |

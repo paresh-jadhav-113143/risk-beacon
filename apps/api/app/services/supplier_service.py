@@ -6,7 +6,10 @@ from fastapi import HTTPException, status
 
 from app.api.dependencies import can_access_supplier
 from app.db.schema import now
+from app.security.auth import hash_password
 from app.services.audit_service import write_audit
+
+DEFAULT_SUPPLIER_PASSWORD = "Password123!"
 
 
 def list_suppliers(conn, user: dict) -> list[dict]:
@@ -74,6 +77,7 @@ def get_supplier_or_404(conn, user: dict, supplier_id: str) -> dict:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Supplier not found")
     supplier = enrich_supplier(conn, dict(row))
     supplier["documents"] = [dict(r) for r in conn.execute("SELECT * FROM documents WHERE supplier_id = ? ORDER BY uploaded_at DESC", (supplier_id,))]
+    supplier["contacts"] = [dict(r) for r in conn.execute("SELECT * FROM supplier_contacts WHERE supplier_id = ? ORDER BY is_primary DESC, created_at DESC", (supplier_id,))]
     supplier["risk_signals"] = [dict(r) for r in conn.execute("SELECT * FROM risk_signals WHERE supplier_id = ? ORDER BY created_at DESC", (supplier_id,))]
     supplier["scores"] = [dict(r) for r in conn.execute("SELECT * FROM risk_scores WHERE supplier_id = ? ORDER BY calculated_at DESC", (supplier_id,))]
     supplier["recommendations"] = [dict(r) for r in conn.execute("SELECT * FROM recommendations WHERE supplier_id = ? ORDER BY created_at DESC", (supplier_id,))]
@@ -126,14 +130,27 @@ def create_supplier(conn, user: dict, payload) -> dict:
         """,
         (f"BSA-{uuid.uuid4().hex[:10]}", user["tenant_id"], supplier_id, user["id"], "manage_onboarding", "active", user["id"], timestamp),
     )
+    invitation = None
     if payload.supplier_contact_email:
         contact_id = f"CON-{uuid.uuid4().hex[:10]}"
+        contact_email = str(payload.supplier_contact_email).lower()
+        contact_name = payload.supplier_contact_name or contact_email.split("@", 1)[0].replace(".", " ").title()
         conn.execute(
             """
             INSERT INTO supplier_contacts(id, tenant_id, supplier_id, name, email, role, is_primary, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (contact_id, user["tenant_id"], supplier_id, payload.supplier_contact_name or "Supplier Contact", payload.supplier_contact_email, "Supplier Admin", 1, timestamp),
+            (contact_id, user["tenant_id"], supplier_id, contact_name, contact_email, "Supplier Admin", 1, timestamp),
+        )
+        invitation = _invite_supplier_admin(
+            conn=conn,
+            tenant_id=user["tenant_id"],
+            supplier_id=supplier_id,
+            contact_id=contact_id,
+            email=contact_email,
+            name=contact_name,
+            invited_by=user["id"],
+            timestamp=timestamp,
         )
     write_audit(
         conn,
@@ -145,4 +162,106 @@ def create_supplier(conn, user: dict, payload) -> dict:
         entity_id=supplier_id,
         after={"supplier_id": supplier_id, "onboarding_request_id": onboarding_id},
     )
-    return get_supplier_or_404(conn, user, supplier_id)
+    created = get_supplier_or_404(conn, user, supplier_id)
+    if invitation:
+        created["invitation"] = invitation
+    return created
+
+
+def _invite_supplier_admin(
+    conn,
+    tenant_id: str,
+    supplier_id: str,
+    contact_id: str,
+    email: str,
+    name: str,
+    invited_by: str,
+    timestamp: str,
+) -> dict:
+    user_row = conn.execute(
+        "SELECT id FROM users WHERE tenant_id = ? AND lower(email) = lower(?)",
+        (tenant_id, email),
+    ).fetchone()
+    created_new_user = user_row is None
+    if user_row:
+        supplier_user_id = user_row["id"]
+    else:
+        supplier_user_id = f"USR-{uuid.uuid4().hex[:10]}"
+        conn.execute(
+            """
+            INSERT INTO users(id, tenant_id, email, password_hash, name, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (supplier_user_id, tenant_id, email, hash_password(DEFAULT_SUPPLIER_PASSWORD), name, "active", timestamp),
+        )
+
+    role = conn.execute(
+        "SELECT id FROM roles WHERE tenant_id = ? AND name = ?",
+        (tenant_id, "Supplier Admin"),
+    ).fetchone()
+    if not role:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Supplier Admin role is not configured")
+    conn.execute(
+        "INSERT OR IGNORE INTO user_roles(user_id, role_id, assigned_at, assigned_by) VALUES (?, ?, ?, ?)",
+        (supplier_user_id, role["id"], timestamp, invited_by),
+    )
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO supplier_user_access(id, tenant_id, supplier_id, user_id, supplier_contact_id,
+          access_role, status, invited_by, invited_at, accepted_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            f"SUA-{uuid.uuid4().hex[:10]}",
+            tenant_id,
+            supplier_id,
+            supplier_user_id,
+            contact_id,
+            "supplier_admin",
+            "active",
+            invited_by,
+            timestamp,
+            timestamp if created_new_user else None,
+            timestamp,
+        ),
+    )
+    conn.execute(
+        """
+        INSERT INTO notifications(id, tenant_id, recipient_id, supplier_id, type, title, body, status, severity, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            f"NOT-{uuid.uuid4().hex[:10]}",
+            tenant_id,
+            supplier_user_id,
+            supplier_id,
+            "supplier_invitation",
+            "Supplier onboarding invitation",
+            "You have been invited to complete supplier onboarding.",
+            "unread",
+            "info",
+            timestamp,
+        ),
+    )
+    write_audit(
+        conn,
+        tenant_id=tenant_id,
+        actor_type="user",
+        actor_id=invited_by,
+        action="supplier.invitation_sent",
+        entity_type="supplier",
+        entity_id=supplier_id,
+        after={"supplier_user_id": supplier_user_id, "email": email, "created_new_user": created_new_user},
+    )
+    invitation = {
+        "status": "created" if created_new_user else "linked_existing_user",
+        "supplier_user_id": supplier_user_id,
+        "email": email,
+        "role": "Supplier Admin",
+        "supplier_id": supplier_id,
+        "login_url": "/auth/login",
+        "password_delivery": "default_password" if created_new_user else "existing_user_password",
+    }
+    if created_new_user:
+        invitation["default_password"] = DEFAULT_SUPPLIER_PASSWORD
+    return invitation

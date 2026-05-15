@@ -65,7 +65,8 @@ body {
 }
 
 .rb-login-panel input,
-.rb-popover input {
+.rb-popover input,
+.rb-profile-form input {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   min-height: 42px;
@@ -346,6 +347,27 @@ body {
   z-index: 10;
 }
 
+.rb-profile-form {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.rb-profile-form label {
+  color: #475569;
+  display: grid;
+  font-size: 13px;
+  font-weight: 750;
+  gap: 6px;
+}
+
+.rb-form-actions {
+  align-items: end;
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+}
+
 .rb-demo-users {
   display: flex;
   flex-wrap: wrap;
@@ -372,7 +394,8 @@ body {
   .rb-shell,
   .rb-grid,
   .rb-metrics,
-  .rb-columns {
+  .rb-columns,
+  .rb-profile-form {
     grid-template-columns: 1fr;
   }
 

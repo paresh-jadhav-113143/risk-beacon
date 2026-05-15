@@ -27,6 +27,10 @@ type Supplier = {
   id: string;
   legal_name: string;
   country: string;
+  tax_id?: string;
+  registration_number?: string;
+  website?: string;
+  industry?: string;
   status: string;
   commodity_category?: string;
   supplier_tier?: string;
@@ -39,6 +43,17 @@ type Supplier = {
   scores?: RiskScore[];
   recommendations?: Recommendation[];
   audit_events?: AuditEvent[];
+  invitation?: SupplierInvitation;
+};
+
+type SupplierInvitation = {
+  status: string;
+  supplier_user_id: string;
+  email: string;
+  role: string;
+  supplier_id: string;
+  password_delivery: string;
+  default_password?: string;
 };
 
 type DocumentRecord = {
@@ -94,6 +109,17 @@ type NewSupplierForm = {
   country: string;
   supplier_contact_name: string;
   supplier_contact_email: string;
+  commodity_category: string;
+  supplier_tier: string;
+};
+
+type SupplierProfileForm = {
+  legal_name: string;
+  country: string;
+  tax_id: string;
+  registration_number: string;
+  website: string;
+  industry: string;
   commodity_category: string;
   supplier_tier: string;
 };
@@ -205,7 +231,13 @@ export function SupplierRiskWorkspace() {
     const created = await request<Supplier>("/suppliers", { method: "POST", body: JSON.stringify(payload) });
     setSelectedId(created.id);
     await refreshSupplier(created.id);
-    setMessage("Supplier onboarding request created.");
+    if (created.invitation?.default_password) {
+      setMessage(`Supplier created. Supplier login: ${created.invitation.email} / ${created.invitation.default_password}`);
+    } else if (created.invitation) {
+      setMessage(`Supplier created. Existing supplier user linked: ${created.invitation.email}`);
+    } else {
+      setMessage("Supplier onboarding request created.");
+    }
   }
 
   async function runAssessment() {
@@ -249,6 +281,17 @@ export function SupplierRiskWorkspace() {
     await refreshSupplier(updated.id);
   }
 
+  async function updateProfile(payload: SupplierProfileForm) {
+    if (!selected) return;
+    const updated = await request<Supplier>(`/suppliers/${selected.id}`, {
+      method: "PATCH",
+      body: JSON.stringify(emptyStringsToNull(payload))
+    });
+    setSelected(updated);
+    await refreshSupplier(updated.id);
+    setMessage("Supplier profile updated.");
+  }
+
   if (!token || !user) {
     return <LoginScreen loading={loading} message={message} onLogin={login} />;
   }
@@ -258,6 +301,7 @@ export function SupplierRiskWorkspace() {
   const canAssess = user.roles.some((role) => ["Procurement Buyer", "Risk Analyst", "System Administrator"].includes(role));
   const canDecide = user.roles.includes("Approver / Risk Committee") || user.roles.includes("System Administrator");
   const canUpload = user.roles.some((role) => ["Supplier Admin", "Procurement Buyer", "System Administrator"].includes(role));
+  const canEditProfile = user.roles.some((role) => ["Supplier Admin", "Procurement Buyer", "System Administrator"].includes(role));
 
   return (
     <div className="rb-shell">
@@ -353,6 +397,10 @@ export function SupplierRiskWorkspace() {
                   <Metric icon={<Gauge />} label="Status" value={selected.status.replaceAll("_", " ")} />
                   <Metric icon={<Bell />} label="Onboarding" value={selected.onboarding?.status ?? "none"} />
                 </section>
+
+                {canEditProfile ? (
+                  <SupplierProfilePanel supplier={selected} onSave={updateProfile} />
+                ) : null}
 
                 <section className="rb-columns">
                   <Panel title="Risk Signals">
@@ -501,6 +549,87 @@ function CreateSupplierButton({ onCreate }: { onCreate: (payload: NewSupplierFor
       ) : null}
     </div>
   );
+}
+
+function SupplierProfilePanel({ supplier, onSave }: { supplier: Supplier; onSave: (payload: SupplierProfileForm) => Promise<void> }) {
+  const [form, setForm] = useState<SupplierProfileForm>(() => profileFromSupplier(supplier));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setForm(profileFromSupplier(supplier));
+  }, [supplier.id]);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await onSave(form);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="rb-panel">
+      <div className="rb-panel-head">
+        <h2>Supplier Profile</h2>
+      </div>
+      <form className="rb-profile-form" onSubmit={submit}>
+        <label>
+          Legal name
+          <input value={form.legal_name} onChange={(event) => setForm({ ...form, legal_name: event.target.value })} required />
+        </label>
+        <label>
+          Country
+          <input value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })} required />
+        </label>
+        <label>
+          Tax ID
+          <input value={form.tax_id} onChange={(event) => setForm({ ...form, tax_id: event.target.value })} />
+        </label>
+        <label>
+          Registration number
+          <input value={form.registration_number} onChange={(event) => setForm({ ...form, registration_number: event.target.value })} />
+        </label>
+        <label>
+          Website
+          <input value={form.website} onChange={(event) => setForm({ ...form, website: event.target.value })} />
+        </label>
+        <label>
+          Industry
+          <input value={form.industry} onChange={(event) => setForm({ ...form, industry: event.target.value })} />
+        </label>
+        <label>
+          Category
+          <input value={form.commodity_category} onChange={(event) => setForm({ ...form, commodity_category: event.target.value })} />
+        </label>
+        <label>
+          Supplier tier
+          <input value={form.supplier_tier} onChange={(event) => setForm({ ...form, supplier_tier: event.target.value })} />
+        </label>
+        <div className="rb-form-actions">
+          <button className="rb-primary" disabled={saving}>{saving ? "Saving..." : "Save profile"}</button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+function profileFromSupplier(supplier: Supplier): SupplierProfileForm {
+  return {
+    legal_name: supplier.legal_name ?? "",
+    country: supplier.country ?? "",
+    tax_id: supplier.tax_id ?? "",
+    registration_number: supplier.registration_number ?? "",
+    website: supplier.website ?? "",
+    industry: supplier.industry ?? "",
+    commodity_category: supplier.commodity_category ?? "",
+    supplier_tier: supplier.supplier_tier ?? ""
+  };
+}
+
+function emptyStringsToNull(payload: SupplierProfileForm) {
+  return Object.fromEntries(Object.entries(payload).map(([key, value]) => [key, value.trim() === "" ? null : value.trim()]));
 }
 
 function RiskPill({ level, score, large = false }: { level: string; score?: number; large?: boolean }) {
