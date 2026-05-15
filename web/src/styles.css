@@ -333,6 +333,34 @@ body {
   padding-top: 12px;
 }
 
+.rb-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.rb-inline-actions button {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #172033;
+  font-size: 12px;
+  font-weight: 750;
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.rb-extraction-list {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px;
+}
+
 .rb-create {
   position: relative;
 }

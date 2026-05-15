@@ -57,8 +57,19 @@ class AgentOrchestrator:
             documents=self.documents.list_for_supplier(user["tenant_id"], supplier_id),
         )
 
-        for agent in [IntakeAgent(), DocumentIntelligenceAgent(), EntityResolutionAgent()]:
-            self._persist_output(context, agent.run(context))
+        intake_output = IntakeAgent().run(context)
+        self._persist_output(context, intake_output)
+
+        document_output = DocumentIntelligenceAgent().run(context)
+        document_run_id = self._persist_output(context, document_output)
+        self._persist_document_extraction(context, document_run_id, document_output)
+        context.extracted_fields.extend(document_output.extracted_facts)
+        context.risk_signals.extend(document_output.risk_signals)
+        context.documents = self.documents.list_for_supplier(user["tenant_id"], supplier_id)
+
+        entity_output = EntityResolutionAgent().run(context)
+        self._persist_output(context, entity_output)
+        context.risk_signals.extend(entity_output.risk_signals)
 
         for agent in [
             SanctionsComplianceAgent(),
@@ -186,3 +197,35 @@ class AgentOrchestrator:
             after={"agent_name": output.agent_name, "status": output.status},
         )
         return run_id
+
+    def _persist_document_extraction(self, context: AgentContext, run_id: str, output: AgentOutput) -> None:
+        timestamped_documents = output.payload.get("document_results", [])
+        for result in timestamped_documents:
+            status = "extracted" if result.get("status") == "extracted" else "failed"
+            authenticity_status = "warning" if result.get("profile_comparisons") else "not_checked"
+            mismatches = [item for item in result.get("profile_comparisons", []) if item.get("status") == "mismatch"]
+            if mismatches:
+                authenticity_status = "needs_review"
+            self.conn.execute(
+                "UPDATE documents SET status = ?, authenticity_status = ? WHERE tenant_id = ? AND id = ?",
+                (status, authenticity_status, context.tenant_id, result["document_id"]),
+            )
+            for field in result.get("extracted_fields", []):
+                self.conn.execute(
+                    """
+                    INSERT INTO extracted_fields(id, tenant_id, supplier_id, document_id, agent_run_id,
+                      field_name, field_value, confidence, source_text, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                    """,
+                    (
+                        f"EXT-{uuid.uuid4().hex[:10]}",
+                        context.tenant_id,
+                        context.supplier_id,
+                        result["document_id"],
+                        run_id,
+                        field["field_name"],
+                        field.get("field_value"),
+                        field["confidence"],
+                        field.get("source_text"),
+                    ),
+                )

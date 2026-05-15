@@ -78,6 +78,7 @@ def get_supplier_or_404(conn, user: dict, supplier_id: str) -> dict:
     supplier = enrich_supplier(conn, dict(row))
     supplier["documents"] = [dict(r) for r in conn.execute("SELECT * FROM documents WHERE supplier_id = ? ORDER BY uploaded_at DESC", (supplier_id,))]
     supplier["contacts"] = [dict(r) for r in conn.execute("SELECT * FROM supplier_contacts WHERE supplier_id = ? ORDER BY is_primary DESC, created_at DESC", (supplier_id,))]
+    supplier["extracted_fields"] = [dict(r) for r in conn.execute("SELECT * FROM extracted_fields WHERE supplier_id = ? ORDER BY created_at DESC", (supplier_id,))]
     supplier["risk_signals"] = [dict(r) for r in conn.execute("SELECT * FROM risk_signals WHERE supplier_id = ? ORDER BY created_at DESC", (supplier_id,))]
     supplier["scores"] = [dict(r) for r in conn.execute("SELECT * FROM risk_scores WHERE supplier_id = ? ORDER BY calculated_at DESC", (supplier_id,))]
     supplier["recommendations"] = [dict(r) for r in conn.execute("SELECT * FROM recommendations WHERE supplier_id = ? ORDER BY created_at DESC", (supplier_id,))]

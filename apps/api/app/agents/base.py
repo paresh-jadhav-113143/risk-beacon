@@ -13,6 +13,7 @@ class AgentContext:
     user: dict
     supplier: dict
     documents: list[dict] = field(default_factory=list)
+    extracted_fields: list[dict] = field(default_factory=list)
     risk_signals: list[dict] = field(default_factory=list)
     score: dict | None = None
     recommendation: dict | None = None

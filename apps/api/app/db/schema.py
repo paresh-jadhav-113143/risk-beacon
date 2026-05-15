@@ -126,6 +126,19 @@ CREATE TABLE IF NOT EXISTS documents (
   uploaded_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS extracted_fields (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  supplier_id TEXT NOT NULL REFERENCES suppliers(id),
+  document_id TEXT NOT NULL REFERENCES documents(id),
+  agent_run_id TEXT REFERENCES agent_runs(id),
+  field_name TEXT NOT NULL,
+  field_value TEXT,
+  confidence REAL NOT NULL,
+  source_text TEXT,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS agent_runs (
   id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL,
@@ -268,6 +281,8 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE INDEX IF NOT EXISTS idx_suppliers_tenant_status ON suppliers(tenant_id, status);
 CREATE INDEX IF NOT EXISTS idx_buyer_access_user ON buyer_supplier_access(tenant_id, user_id, status);
 CREATE INDEX IF NOT EXISTS idx_supplier_access_user ON supplier_user_access(tenant_id, user_id, status);
+CREATE INDEX IF NOT EXISTS idx_extracted_fields_document ON extracted_fields(tenant_id, document_id, field_name);
+CREATE INDEX IF NOT EXISTS idx_extracted_fields_supplier ON extracted_fields(tenant_id, supplier_id, field_name);
 CREATE INDEX IF NOT EXISTS idx_risk_signals_supplier ON risk_signals(tenant_id, supplier_id, category);
 CREATE INDEX IF NOT EXISTS idx_scores_supplier ON risk_scores(tenant_id, supplier_id, calculated_at);
 CREATE INDEX IF NOT EXISTS idx_review_queue ON review_queue_items(tenant_id, status, assigned_role);

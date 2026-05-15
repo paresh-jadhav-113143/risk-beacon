@@ -74,3 +74,8 @@ class DocumentCreate(BaseModel):
 class DecisionCreate(BaseModel):
     decision: str
     reason: str = Field(min_length=3)
+
+
+class FindingReview(BaseModel):
+    action: Literal["accept", "dismiss", "request_information"]
+    reason: str = Field(min_length=3)

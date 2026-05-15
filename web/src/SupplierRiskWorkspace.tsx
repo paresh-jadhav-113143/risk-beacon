@@ -39,6 +39,7 @@ type Supplier = {
   document_count: number;
   active_signal_count: number;
   documents?: DocumentRecord[];
+  extracted_fields?: ExtractedField[];
   risk_signals?: RiskSignal[];
   scores?: RiskScore[];
   recommendations?: Recommendation[];
@@ -72,6 +73,16 @@ type RiskSignal = {
   confidence: number;
   interpretation: string;
   recommended_action: string;
+  status: string;
+};
+
+type ExtractedField = {
+  id: string;
+  document_id: string;
+  field_name: string;
+  field_value?: string;
+  confidence: number;
+  source_text?: string;
 };
 
 type RiskScore = {
@@ -337,6 +348,19 @@ export function SupplierRiskWorkspace() {
     setMessage("Supplier profile updated.");
   }
 
+  async function reviewFinding(signalId: string, action: "accept" | "dismiss" | "request_information") {
+    if (!selected) return;
+    const reason = window.prompt(`Reason to ${action.replace("_", " ")} this finding?`);
+    if (!reason) return;
+    const updated = await request<Supplier>(`/suppliers/${selected.id}/risk-signals/${signalId}/review`, {
+      method: "POST",
+      body: JSON.stringify({ action, reason })
+    });
+    setSelected(updated);
+    await refreshSupplier(updated.id);
+    setMessage(`Finding ${action.replace("_", " ")} saved.`);
+  }
+
   if (!token || !user) {
     return <LoginScreen loading={loading} message={message} onLogin={login} />;
   }
@@ -347,6 +371,7 @@ export function SupplierRiskWorkspace() {
   const canDecide = user.roles.includes("Approver / Risk Committee") || user.roles.includes("System Administrator");
   const canUpload = user.roles.some((role) => ["Supplier Admin", "Procurement Buyer", "System Administrator"].includes(role));
   const canEditProfile = user.roles.some((role) => ["Supplier Admin", "Procurement Buyer", "System Administrator"].includes(role));
+  const canReviewFindings = user.roles.some((role) => ["Risk Analyst", "System Administrator"].includes(role));
 
   return (
     <div className="rb-shell">
@@ -451,9 +476,16 @@ export function SupplierRiskWorkspace() {
                   <Panel title="Risk Signals">
                     {selected.risk_signals?.length ? selected.risk_signals.map((signal) => (
                       <div className="rb-item" key={signal.id}>
-                        <strong>{signal.category} · {signal.severity}</strong>
+                        <strong>{signal.category} · {signal.severity} · {signal.status}</strong>
                         <span>{signal.signal}</span>
                         <small>{Math.round(signal.confidence * 100)}% confidence · {signal.recommended_action}</small>
+                        {canReviewFindings && signal.status === "active" ? (
+                          <div className="rb-inline-actions">
+                            <button onClick={() => void reviewFinding(signal.id, "accept")}>Accept</button>
+                            <button onClick={() => void reviewFinding(signal.id, "dismiss")}>Dismiss</button>
+                            <button onClick={() => void reviewFinding(signal.id, "request_information")}>Need info</button>
+                          </div>
+                        ) : null}
                       </div>
                     )) : <p className="rb-empty">No active risk signals yet.</p>}
                   </Panel>
@@ -465,6 +497,14 @@ export function SupplierRiskWorkspace() {
                         <small>{document.status}</small>
                       </div>
                     ))}
+                    {selected.extracted_fields?.length ? (
+                      <div className="rb-extraction-list">
+                        <strong>Extracted fields</strong>
+                        {selected.extracted_fields.slice(0, 8).map((field) => (
+                          <small key={field.id}>{field.field_name}: {field.field_value ?? "empty"} ({Math.round(field.confidence * 100)}%)</small>
+                        ))}
+                      </div>
+                    ) : null}
                   </Panel>
                 </section>
 
