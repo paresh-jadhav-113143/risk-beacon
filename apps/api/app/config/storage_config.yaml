@@ -1,0 +1,5 @@
+storage:
+  provider: local
+  local:
+    root_env: LOCAL_STORAGE_ROOT
+    default_root: ./storage

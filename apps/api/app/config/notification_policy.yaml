@@ -1,0 +1,5 @@
+channels:
+  in_app:
+    enabled: true
+  email:
+    enabled: false

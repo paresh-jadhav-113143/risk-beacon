@@ -1,0 +1,16 @@
+policy_id: POLICY-001
+version: "2026.05.01"
+thresholds:
+  low: [0, 39]
+  medium: [40, 69]
+  high: [70, 84]
+  critical: [85, 100]
+category_weights:
+  compliance: 0.25
+  financial: 0.15
+  esg: 0.15
+  cyber: 0.10
+  operational: 0.10
+  reputation: 0.10
+  logistics: 0.05
+  authenticity: 0.10

@@ -1,0 +1,9 @@
+document_types:
+  business_registration:
+    required_for: ["pre_onboarding"]
+  tax_certificate:
+    required_for: ["pre_onboarding"]
+  bank_letter:
+    required_for: ["financial_review"]
+  esg_declaration:
+    required_for: ["risk_review"]

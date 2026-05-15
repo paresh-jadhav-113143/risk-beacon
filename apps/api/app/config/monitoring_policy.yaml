@@ -1,0 +1,3 @@
+monitoring:
+  enabled_by_default: false
+  default_cadence: weekly

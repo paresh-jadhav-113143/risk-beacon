@@ -1,0 +1,12 @@
+.DS_Store
+.pycache/
+data/*.db
+data/*.db-shm
+data/*.db-wal
+storage/documents/*
+storage/evidence/*
+storage/agent-artifacts/*
+apps/api/.venv/
+apps/api/.env
+web/dist/
+web/node_modules/

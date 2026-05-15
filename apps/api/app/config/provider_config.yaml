@@ -1,0 +1,28 @@
+providers:
+  sanctions_provider:
+    enabled: false
+    base_url_env: SANCTIONS_PROVIDER_BASE_URL
+    api_key_env: SANCTIONS_PROVIDER_API_KEY
+    timeout_seconds: 10
+    retries: 2
+  news_provider:
+    enabled: true
+    base_url_env: NEWS_PROVIDER_BASE_URL
+    api_key_env: NEWS_API_KEY
+    timeout_seconds: 15
+    retries: 2
+  sec_filings:
+    enabled: true
+    user_agent_env: SEC_USER_AGENT
+    timeout_seconds: 20
+    retries: 2
+  tavily_search:
+    enabled: false
+    api_key_env: TAVILY_API_KEY
+    timeout_seconds: 15
+    retries: 2
+  serpapi_search:
+    enabled: false
+    api_key_env: SERPAPI_API_KEY
+    timeout_seconds: 15
+    retries: 2

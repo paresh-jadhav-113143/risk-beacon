@@ -1,0 +1,11 @@
+database:
+  engine: sqlite
+  url_env: DATABASE_URL
+  local_file: ./data/risk_beacon.db
+  pragmas:
+    journal_mode: WAL
+    busy_timeout: 5000
+    foreign_keys: true
+  migrations:
+    tool: alembic
+    directory: apps/api/app/db/migrations

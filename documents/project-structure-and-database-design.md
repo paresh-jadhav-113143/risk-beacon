@@ -359,9 +359,13 @@ python-jose[cryptography]
 httpx
 pyyaml
 tenacity
-celery
-redis
 openai
+langchain
+langchain-openai
+beautifulsoup4
+pypdf
+pillow
+pytesseract
 ```
 
 For local development and testing, keep separate dev-only dependencies in `requirements-dev.txt`.
@@ -394,6 +398,11 @@ class Settings(BaseSettings):
 
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"
+    openai_embedding_model: str = "text-embedding-3-small"
+    tavily_api_key: str | None = None
+    serpapi_api_key: str | None = None
+    news_api_key: str | None = None
+    sec_user_agent: str = "risk-beacon-local@example.com"
 
     local_storage_root: str = "./storage"
 
@@ -418,6 +427,12 @@ SQLITE_BUSY_TIMEOUT_MS=5000
 
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+
+TAVILY_API_KEY=
+SERPAPI_API_KEY=
+NEWS_API_KEY=
+SEC_USER_AGENT=risk-beacon-local@example.com
 
 LOCAL_STORAGE_ROOT=./storage
 
