@@ -112,10 +112,6 @@ Implementation rules:
 - Supplier Admin
 - Procurement Buyer
 - Risk Analyst
-- Compliance Officer
-- ESG Analyst
-- Finance Analyst
-- Cyber Risk Analyst
 - Supplier Relationship Manager
 - Approver / Risk Committee
 - System Administrator
@@ -261,9 +257,7 @@ Start with configurable but deterministic rules:
 
 ### User Workflows
 
-- Risk Analyst reviews AI findings and evidence.
-- Compliance Officer reviews sanctions and regulatory findings.
-- Finance Analyst reviews financial risk signals.
+- Risk Analyst reviews AI findings and evidence across compliance, financial, ESG, cyber, operational, reputation, authenticity, and anomaly categories.
 - Approver makes final approve, reject, defer, or request-information decision.
 - Auditor reviews historical decisions and evidence trails.
 

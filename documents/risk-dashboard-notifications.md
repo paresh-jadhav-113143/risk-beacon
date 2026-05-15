@@ -78,14 +78,14 @@ The dashboard should help users quickly answer:
 
 | Trigger | Severity Example | Action |
 |---|---|---|
-| Supplier appears on sanctions/watchlist | Critical | Alert compliance and block onboarding |
+| Supplier appears on sanctions/watchlist | Critical | Alert risk analyst and block onboarding until human decision |
 | Negative news spike | Medium/High | Notify risk owner and refresh score |
 | Litigation or regulatory notice | High | Open investigation case |
 | Certificate expired | Medium | Request updated document |
-| Financial distress signal | High | Notify finance analyst |
+| Financial distress signal | High | Notify risk analyst |
 | Ownership/director/address change | Medium/High | Trigger entity verification |
 | Shipment activity drops suddenly | Medium | Notify supplier relationship manager |
-| ESG controversy detected | Medium/High | Route to ESG analyst |
+| ESG controversy detected | Medium/High | Route to risk analyst |
 | Document authenticity issue | High/Critical | Pause onboarding and open case |
 | Risk score crosses threshold | High/Critical | Escalate to approver |
 
@@ -102,11 +102,10 @@ The dashboard should help users quickly answer:
 
 | Risk Type | Primary Owner |
 |---|---|
-| Sanctions / Watchlist | Compliance Officer |
-| Financial Risk | Finance Analyst |
-| ESG Risk | ESG Analyst |
-| Cyber Risk | Cyber Risk Analyst |
+| Sanctions / Watchlist | Risk Analyst |
+| Financial Risk | Risk Analyst |
+| ESG Risk | Risk Analyst |
+| Cyber Risk | Risk Analyst |
 | Operational Risk | Supplier Relationship Manager |
 | Reputational Risk | Risk Analyst |
 | Critical Composite Risk | Risk Committee / Approver |
-

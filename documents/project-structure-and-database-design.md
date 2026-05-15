@@ -544,6 +544,22 @@ Indexes:
 UNIQUE(tenant_id, name)
 ```
 
+Initial MVP role seed data:
+
+```json
+[
+  "Supplier Admin",
+  "Procurement Buyer",
+  "Risk Analyst",
+  "Supplier Relationship Manager",
+  "Approver / Risk Committee",
+  "System Administrator",
+  "Auditor"
+]
+```
+
+The application should not seed separate category-specific reviewer roles. Compliance, financial, ESG, and cyber findings remain risk categories and should route to the Risk Analyst role.
+
 ### `permissions`
 
 Stores granular permissions.

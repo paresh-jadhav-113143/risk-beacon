@@ -25,8 +25,7 @@ The MVP assumes:
 | Scoring Agent | Calculates deterministic category and composite scores |
 | Recommendation Agent | Creates advisory recommendation |
 | Human Review Agent | Prepares review packet and routes work |
-| Risk Analyst | Reviews overall findings and evidence |
-| Compliance / Finance / ESG / Cyber Analyst | Reviews category-specific findings |
+| Risk Analyst | Reviews overall findings and category-specific evidence across compliance, financial, ESG, cyber, operational, reputation, authenticity, and anomaly risk |
 | Approver / Risk Committee | Makes final approve, reject, defer, or enhanced due diligence decision |
 | Notification Agent | Sends in-app and email notifications |
 | Auditor | Reviews historical evidence, decisions, and audit trail |
@@ -94,7 +93,7 @@ This is the standard successful onboarding sequence.
 | 11 | Scoring Agent | Scoring starts | Calculate category scores, composite score, and risk level from persisted risk signals | Recommendation Agent |
 | 12 | Recommendation Agent | Recommendation starts | Create advisory recommendation with evidence-linked rationale | Human Review Agent |
 | 13 | Human Review Agent | Review packet generation starts | Create review packet and route to correct reviewer or approver | Risk Analyst |
-| 14 | Risk Analyst | Analyst reviews findings | Accept, dismiss, or comment on findings; request specialist review if needed | Approver / Risk Committee |
+| 14 | Risk Analyst | Analyst reviews findings | Accept, dismiss, comment on findings, or request supplier clarification if needed | Approver / Risk Committee |
 | 15 | Approver / Risk Committee | Approver reviews packet | Make final approve decision with reason | Notification Agent |
 | 16 | Notification Agent | Final decision notification starts | Notify buyer and supplier, update supplier status to approved, write audit events | Workflow complete |
 
@@ -293,13 +292,14 @@ Next owner:
 
 ### 8. Human Review
 
-Owner: Risk Analyst or specialist analyst
+Owner: Risk Analyst
 
 Analyst actions:
 
 - Reviews score, risk signals, evidence, extracted facts, and AI interpretation.
 - Accepts or dismisses findings with reason.
-- Requests compliance, finance, ESG, cyber, or supplier relationship review if needed.
+- Reviews compliance, finance, ESG, cyber, operational, reputation, authenticity, and anomaly findings in one risk review workflow.
+- Requests supplier relationship manager input if operational remediation context is needed.
 - Requests supplier clarification when data is incomplete.
 - Sends review outcome to approver.
 
@@ -313,7 +313,6 @@ System actions:
 Next owner:
 
 - Supplier Admin if clarification is required.
-- Specialist Analyst if category review is required.
 - Approver / Risk Committee if ready for final decision.
 
 ### 9. Final Decision
@@ -347,7 +346,7 @@ Next owner:
 
 - Workflow complete if approved or rejected.
 - Supplier Admin if more information is required.
-- Risk Analyst or specialist analyst if enhanced due diligence is required.
+- Risk Analyst if enhanced due diligence is required.
 
 ## Scenario 1: Missing Required Information
 
@@ -421,8 +420,8 @@ This scenario applies when sanctions, watchlist, legal, or regulatory checks fin
 | Step | Owner | Event | Outcome |
 |---:|---|---|---|
 | 1 | Sanctions and Compliance Agent | Finds high or critical candidate match | Creates compliance risk signal |
-| 2 | Notification Agent | Notifies Compliance Officer | Compliance Officer becomes next owner |
-| 3 | Compliance Officer | Reviews match details and evidence | Confirms, dismisses, or escalates |
+| 2 | Notification Agent | Notifies Risk Analyst | Risk Analyst becomes next owner |
+| 3 | Risk Analyst | Reviews match details and evidence | Confirms, dismisses, or escalates |
 | 4 | Risk Analyst | Updates review packet | Adds compliance outcome |
 | 5 | Approver / Risk Committee | Reviews critical finding | Rejects, blocks, defers, or requires executive approval |
 
@@ -440,7 +439,7 @@ This scenario applies when a document appears suspicious or inconsistent.
 |---:|---|---|---|
 | 1 | Authenticity Agent | Detects tampering, metadata mismatch, or certificate inconsistency | Creates authenticity finding |
 | 2 | System | Pauses normal onboarding progression | Status moves to `in_review` or `enhanced_due_diligence` |
-| 3 | Risk Analyst / Compliance Officer | Reviews document and evidence | Accepts, dismisses, or requests replacement |
+| 3 | Risk Analyst | Reviews document and evidence | Accepts, dismisses, or requests replacement |
 | 4 | Supplier Admin | Uploads replacement if requested | Document extraction and authenticity check re-run |
 | 5 | Approver | Makes final decision | Approve, reject, defer, or enhanced due diligence |
 
@@ -564,11 +563,7 @@ After login, users should land on the screen that matches their role and current
 |---|---|---|
 | Supplier Admin | Supplier portal | Assigned supplier profile, document checklist, clarification requests, onboarding status |
 | Procurement Buyer | Buyer dashboard | Only linked suppliers, onboarding requests, pending supplier actions, final status |
-| Risk Analyst | Review queue | Assigned reviews, supplier risk packets, pending analyst actions |
-| Compliance Officer | Compliance queue | Sanctions, watchlist, regulatory, and policy findings requiring review |
-| ESG Analyst | ESG queue | ESG findings, sustainability evidence, ESG review tasks |
-| Finance Analyst | Finance queue | Financial findings, credit signals, bankruptcy indicators |
-| Cyber Risk Analyst | Cyber queue | Cyber findings, breach signals, security certifications |
+| Risk Analyst | Review queue | Assigned reviews, supplier risk packets, category findings, pending analyst actions |
 | Supplier Relationship Manager | Supplier portfolio | Approved suppliers assigned to them, monitoring events, open cases |
 | Approver / Risk Committee | Approval queue | Suppliers ready for final decision |
 | System Administrator | Admin console | Users, roles, permissions, providers, scoring policies, notification policies |
@@ -590,11 +585,11 @@ The application should always make the next actionable owner clear.
 | Scoring pending | Scoring Agent |
 | Recommendation pending | Recommendation Agent |
 | Review packet pending | Human Review Agent |
-| Medium or high findings unresolved | Risk Analyst or Specialist Analyst |
-| Compliance finding unresolved | Compliance Officer |
-| Financial finding unresolved | Finance Analyst |
-| ESG finding unresolved | ESG Analyst |
-| Cyber finding unresolved | Cyber Risk Analyst |
+| Medium or high findings unresolved | Risk Analyst |
+| Compliance finding unresolved | Risk Analyst |
+| Financial finding unresolved | Risk Analyst |
+| ESG finding unresolved | Risk Analyst |
+| Cyber finding unresolved | Risk Analyst |
 | Final decision pending | Approver / Risk Committee |
 | Supplier approved and monitoring enabled | Monitoring Agent |
 | Monitoring threshold crossed | Supplier Relationship Manager or Risk Analyst |

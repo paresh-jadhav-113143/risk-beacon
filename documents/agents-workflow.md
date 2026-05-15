@@ -169,7 +169,7 @@ These objects are reused in agent inputs and outputs.
   ],
   "interpretation": "The supplier name closely matches an entity in a sanctions screening result and requires compliance review.",
   "evidence_source_ids": ["EVD-001"],
-  "recommended_action": "Route to compliance officer for review"
+  "recommended_action": "Route to risk analyst for review"
 }
 ```
 
@@ -639,13 +639,13 @@ Screen supplier, aliases, directors, UBOs, addresses, and related entities again
       "severity": "high",
       "confidence": 0.86,
       "evidence_source_ids": ["EVD-COMP-001"],
-      "recommended_action": "Route to compliance officer for review"
+      "recommended_action": "Route to risk analyst for compliance review"
     }
   ],
   "next_actions": [
     {
       "action": "route_review",
-      "owner_role": "Compliance Officer"
+      "owner_role": "Risk Analyst"
     }
   ]
 }
@@ -688,7 +688,7 @@ Assess financial distress indicators, bankruptcy signals, credit weakness, payme
 - Supplier assessment reaches enrichment stage.
 - Financial documents are extracted.
 - Monitoring detects financial event.
-- Manual refresh requested by finance analyst.
+- Manual refresh requested by risk analyst.
 
 ### Input JSON
 
@@ -741,7 +741,7 @@ Assess financial distress indicators, bankruptcy signals, credit weakness, payme
       "severity": "medium",
       "confidence": 0.82,
       "evidence_source_ids": ["EVD-FIN-001"],
-      "recommended_action": "Route to finance analyst if composite score exceeds review threshold"
+      "recommended_action": "Route to risk analyst if composite score exceeds review threshold"
     }
   ]
 }
@@ -852,7 +852,7 @@ Identify sustainability, labor, environmental, governance, human rights, and eth
 
 - Avoid treating absence of public ESG controversy as verified compliance.
 - Track source coverage by geography and language.
-- Route material ESG concerns to ESG Analyst.
+- Route material ESG concerns to Risk Analyst.
 
 ## 7. News and Reputation Agent
 
@@ -1041,7 +1041,7 @@ Detect document tampering, fake certificates, inconsistent metadata, reused temp
 
 - Document extraction completed.
 - High-value or high-risk supplier submitted.
-- Compliance or analyst manually requests authenticity check.
+- Risk analyst manually requests authenticity check.
 - Document version replaced.
 
 ### Input JSON
@@ -1471,8 +1471,7 @@ Prepare analyst review packets, decision summaries, evidence bundles, and role-s
   "risk_score_id": "SCORE-001",
   "review_policy": {
     "required_roles": ["Risk Analyst"],
-    "route_compliance_findings_to": "Compliance Officer",
-    "route_financial_findings_to": "Finance Analyst"
+    "route_category_findings_to": "Risk Analyst"
   }
 }
 ```
@@ -1488,7 +1487,7 @@ Prepare analyst review packets, decision summaries, evidence bundles, and role-s
   "review_packet": {
     "review_packet_id": "REVP-001",
     "summary": "Medium-risk supplier requiring analyst review before onboarding.",
-    "assigned_roles": ["Risk Analyst", "Compliance Officer"],
+    "assigned_roles": ["Risk Analyst"],
     "priority": "medium",
     "sections": [
       {

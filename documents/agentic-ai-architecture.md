@@ -56,7 +56,7 @@ Each agent should return structured output:
     "retrieved_at": "2026-05-11T10:00:00Z"
   },
   "evidence_summary": "The supplier appears in a regulatory notice related to non-compliance.",
-  "recommended_action": "Route to compliance officer for review"
+  "recommended_action": "Route to risk analyst for review"
 }
 ```
 
@@ -68,4 +68,3 @@ Each agent should return structured output:
 - Do not allow AI-only final rejection or approval.
 - Log all agent outputs and human overrides.
 - Use deterministic scoring rules for final score calculation wherever possible.
-
