@@ -65,8 +65,11 @@ body {
 }
 
 .rb-login-panel input,
+.rb-popover select,
 .rb-popover input,
+.rb-profile-form select,
 .rb-profile-form input {
+  background: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   min-height: 42px;

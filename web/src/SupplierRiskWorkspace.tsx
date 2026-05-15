@@ -124,6 +124,11 @@ type SupplierProfileForm = {
   supplier_tier: string;
 };
 
+type DocumentForm = {
+  document_type: string;
+  file_name: string;
+};
+
 const demoUsers = [
   "buyer@example.com",
   "supplier@example.com",
@@ -132,6 +137,48 @@ const demoUsers = [
   "srm@example.com",
   "admin@example.com",
   "auditor@example.com"
+];
+
+const countryOptions = [
+  { value: "IN", label: "India" },
+  { value: "US", label: "United States" },
+  { value: "GB", label: "United Kingdom" },
+  { value: "DE", label: "Germany" },
+  { value: "SG", label: "Singapore" },
+  { value: "AE", label: "United Arab Emirates" }
+];
+
+const industryOptions = [
+  "Electronic Components",
+  "Manufacturing",
+  "Packaging",
+  "Information Technology",
+  "Logistics",
+  "Professional Services",
+  "Raw Materials",
+  "Pharmaceuticals"
+];
+
+const categoryOptions = [
+  "Electronic assemblies",
+  "Semiconductors",
+  "Packaging",
+  "IT services",
+  "Raw materials",
+  "Logistics",
+  "Professional services"
+];
+
+const tierOptions = ["Tier 1", "Tier 2", "Tier 3", "Strategic"];
+
+const documentTypeOptions = [
+  { value: "business_registration", label: "Business registration" },
+  { value: "tax_certificate", label: "Tax certificate" },
+  { value: "bank_letter", label: "Bank letter" },
+  { value: "financial_statement", label: "Financial statement" },
+  { value: "sustainability_certificate", label: "Sustainability certificate" },
+  { value: "insurance_certificate", label: "Insurance certificate" },
+  { value: "quality_certificate", label: "Quality certificate" }
 ];
 
 export function SupplierRiskWorkspace() {
@@ -268,17 +315,15 @@ export function SupplierRiskWorkspace() {
     setMessage(`Decision saved: ${decision}`);
   }
 
-  async function addDocument() {
+  async function addDocument(payload: DocumentForm) {
     if (!selected) return;
-    const document_type = window.prompt("Document type", "business_registration");
-    const file_name = window.prompt("File name", "document.pdf");
-    if (!document_type || !file_name) return;
     const updated = await request<Supplier>(`/suppliers/${selected.id}/documents`, {
       method: "POST",
-      body: JSON.stringify({ document_type, file_name })
+      body: JSON.stringify(payload)
     });
     setSelected(updated);
     await refreshSupplier(updated.id);
+    setMessage("Document added.");
   }
 
   async function updateProfile(payload: SupplierProfileForm) {
@@ -380,7 +425,7 @@ export function SupplierRiskWorkspace() {
                     <RiskPill level={selected.latest_score?.risk_level ?? "unscored"} score={selected.latest_score?.composite_score} large />
                   </div>
                   <div className="rb-actions">
-                    {canUpload ? <button onClick={addDocument}><FileText size={16} /> Add document</button> : null}
+                    {canUpload ? <AddDocumentButton onAdd={addDocument} /> : null}
                     {canAssess ? <button onClick={runAssessment} disabled={loading}><Play size={16} /> Run assessment</button> : null}
                     {canDecide ? (
                       <>
@@ -523,7 +568,7 @@ function CreateSupplierButton({ onCreate }: { onCreate: (payload: NewSupplierFor
     country: "IN",
     supplier_contact_name: "",
     supplier_contact_email: "",
-    commodity_category: "",
+    commodity_category: "Packaging",
     supplier_tier: "Tier 2"
   });
 
@@ -531,7 +576,7 @@ function CreateSupplierButton({ onCreate }: { onCreate: (payload: NewSupplierFor
     event.preventDefault();
     await onCreate(form);
     setOpen(false);
-    setForm({ legal_name: "", country: "IN", supplier_contact_name: "", supplier_contact_email: "", commodity_category: "", supplier_tier: "Tier 2" });
+    setForm({ legal_name: "", country: "IN", supplier_contact_name: "", supplier_contact_email: "", commodity_category: "Packaging", supplier_tier: "Tier 2" });
   }
 
   return (
@@ -540,11 +585,45 @@ function CreateSupplierButton({ onCreate }: { onCreate: (payload: NewSupplierFor
       {open ? (
         <form className="rb-popover" onSubmit={submit}>
           <input placeholder="Legal name" value={form.legal_name} onChange={(event) => setForm({ ...form, legal_name: event.target.value })} required />
-          <input placeholder="Country code" value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })} required />
+          <select value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })} required>
+            {countryOptions.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
+          </select>
           <input placeholder="Supplier contact name" value={form.supplier_contact_name} onChange={(event) => setForm({ ...form, supplier_contact_name: event.target.value })} />
           <input placeholder="Supplier contact email" value={form.supplier_contact_email} onChange={(event) => setForm({ ...form, supplier_contact_email: event.target.value })} />
-          <input placeholder="Category" value={form.commodity_category} onChange={(event) => setForm({ ...form, commodity_category: event.target.value })} />
+          <select value={form.commodity_category} onChange={(event) => setForm({ ...form, commodity_category: event.target.value })} required>
+            {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
+          </select>
+          <select value={form.supplier_tier} onChange={(event) => setForm({ ...form, supplier_tier: event.target.value })} required>
+            {tierOptions.map((tier) => <option key={tier} value={tier}>{tier}</option>)}
+          </select>
           <button>Create onboarding</button>
+        </form>
+      ) : null}
+    </div>
+  );
+}
+
+function AddDocumentButton({ onAdd }: { onAdd: (payload: DocumentForm) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState<DocumentForm>({ document_type: "business_registration", file_name: "" });
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    await onAdd(form);
+    setOpen(false);
+    setForm({ document_type: "business_registration", file_name: "" });
+  }
+
+  return (
+    <div className="rb-create">
+      <button type="button" onClick={() => setOpen((value) => !value)}><FileText size={16} /> Add document</button>
+      {open ? (
+        <form className="rb-popover" onSubmit={submit}>
+          <select value={form.document_type} onChange={(event) => setForm({ ...form, document_type: event.target.value })} required>
+            {documentTypeOptions.map((documentType) => <option key={documentType.value} value={documentType.value}>{documentType.label}</option>)}
+          </select>
+          <input placeholder="File name" value={form.file_name} onChange={(event) => setForm({ ...form, file_name: event.target.value })} required />
+          <button>Add document</button>
         </form>
       ) : null}
     </div>
@@ -581,7 +660,9 @@ function SupplierProfilePanel({ supplier, onSave }: { supplier: Supplier; onSave
         </label>
         <label>
           Country
-          <input value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })} required />
+          <select value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })} required>
+            {countryOptions.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
+          </select>
         </label>
         <label>
           Tax ID
@@ -597,15 +678,24 @@ function SupplierProfilePanel({ supplier, onSave }: { supplier: Supplier; onSave
         </label>
         <label>
           Industry
-          <input value={form.industry} onChange={(event) => setForm({ ...form, industry: event.target.value })} />
+          <select value={form.industry} onChange={(event) => setForm({ ...form, industry: event.target.value })}>
+            <option value="">Select industry</option>
+            {optionsWithCurrent(industryOptions, form.industry).map((industry) => <option key={industry} value={industry}>{industry}</option>)}
+          </select>
         </label>
         <label>
           Category
-          <input value={form.commodity_category} onChange={(event) => setForm({ ...form, commodity_category: event.target.value })} />
+          <select value={form.commodity_category} onChange={(event) => setForm({ ...form, commodity_category: event.target.value })}>
+            <option value="">Select category</option>
+            {optionsWithCurrent(categoryOptions, form.commodity_category).map((category) => <option key={category} value={category}>{category}</option>)}
+          </select>
         </label>
         <label>
           Supplier tier
-          <input value={form.supplier_tier} onChange={(event) => setForm({ ...form, supplier_tier: event.target.value })} />
+          <select value={form.supplier_tier} onChange={(event) => setForm({ ...form, supplier_tier: event.target.value })}>
+            <option value="">Select tier</option>
+            {optionsWithCurrent(tierOptions, form.supplier_tier).map((tier) => <option key={tier} value={tier}>{tier}</option>)}
+          </select>
         </label>
         <div className="rb-form-actions">
           <button className="rb-primary" disabled={saving}>{saving ? "Saving..." : "Save profile"}</button>
@@ -630,6 +720,11 @@ function profileFromSupplier(supplier: Supplier): SupplierProfileForm {
 
 function emptyStringsToNull(payload: SupplierProfileForm) {
   return Object.fromEntries(Object.entries(payload).map(([key, value]) => [key, value.trim() === "" ? null : value.trim()]));
+}
+
+function optionsWithCurrent(options: string[], current: string) {
+  if (!current || options.includes(current)) return options;
+  return [current, ...options];
 }
 
 function RiskPill({ level, score, large = false }: { level: string; score?: number; large?: boolean }) {
