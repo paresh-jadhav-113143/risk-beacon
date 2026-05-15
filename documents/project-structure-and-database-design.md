@@ -214,11 +214,14 @@ risk-beacon/
 │   │   │   │
 │   │   │   ├── config/
 │   │   │   │   ├── settings.py
+│   │   │   │   ├── database_config.yaml
+│   │   │   │   ├── llm_config.yaml
 │   │   │   │   ├── agent_config.yaml
 │   │   │   │   ├── scoring_policy.yaml
 │   │   │   │   ├── notification_policy.yaml
 │   │   │   │   ├── document_types.yaml
 │   │   │   │   ├── provider_config.yaml
+│   │   │   │   ├── storage_config.yaml
 │   │   │   │   ├── rbac_policy.yaml
 │   │   │   │   └── monitoring_policy.yaml
 │   │   │   │
@@ -235,6 +238,8 @@ risk-beacon/
 │   │   │
 │   │   ├── alembic.ini
 │   │   ├── pyproject.toml
+│   │   ├── requirements.txt
+│   │   ├── requirements-dev.txt
 │   │   └── tests/
 │   │       ├── unit/
 │   │       ├── integration/
@@ -261,6 +266,7 @@ risk-beacon/
 │   └── ...
 │
 ├── .env.example
+├── .gitignore
 ├── docker-compose.yml
 └── README.md
 ```
@@ -283,7 +289,7 @@ risk-beacon/
 | `services/persistence_service.py` | Validates and persists agent outputs in short SQLite transactions |
 | `services/audit_service.py` | Writes immutable audit events for material actions |
 | `workers` | Background task execution for documents, agents, enrichment, scoring, monitoring, and notifications |
-| `config` | Runtime configuration, policies, provider settings, agent tool permissions, and scoring rules |
+| `config` | Runtime configuration, database settings, LLM settings, policies, provider settings, agent tool permissions, and scoring rules |
 | `observability` | Structured logs, metrics, and traces |
 | `security` | Email/password authentication, password hashing, RBAC, supplier visibility checks, redaction, and encryption helpers |
 
@@ -321,6 +327,145 @@ API route or worker task
 ```
 
 ## Configuration Files
+
+Runtime configuration should be centralized through `config/settings.py`. YAML files should define non-secret defaults and policy settings. Secrets should be read from environment variables, usually documented in `.env.example`.
+
+Recommended loading order:
+
+```text
+Environment variables
+→ .env file for local development
+→ YAML config defaults
+→ hardcoded safe defaults only when appropriate
+```
+
+Do not store real API keys, database secrets, SMTP passwords, or provider tokens in YAML files or committed source code.
+
+### `requirements.txt`
+
+Defines runtime Python dependencies for simple installation and deployment.
+
+```text
+fastapi
+uvicorn[standard]
+sqlmodel
+sqlalchemy
+alembic
+pydantic
+pydantic-settings
+python-dotenv
+passlib[bcrypt]
+python-jose[cryptography]
+httpx
+pyyaml
+tenacity
+celery
+redis
+openai
+```
+
+For local development and testing, keep separate dev-only dependencies in `requirements-dev.txt`.
+
+```text
+pytest
+pytest-asyncio
+ruff
+mypy
+httpx
+faker
+```
+
+If the project uses `pyproject.toml` as the primary dependency source, `requirements.txt` can still be generated or maintained as the deployment-friendly install file.
+
+### `settings.py`
+
+Reads environment variables and exposes typed application settings.
+
+```python
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    app_env: str = "local"
+    secret_key: str
+
+    database_url: str = "sqlite:///./data/risk_beacon.db"
+    sqlite_busy_timeout_ms: int = 5000
+
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4.1-mini"
+
+    local_storage_root: str = "./storage"
+
+    class Config:
+        env_file = ".env"
+        extra = "ignore"
+
+
+settings = Settings()
+```
+
+### `.env.example`
+
+Documents required local environment variables without committing real secrets.
+
+```bash
+APP_ENV=local
+SECRET_KEY=change-me-local-secret
+
+DATABASE_URL=sqlite:///./data/risk_beacon.db
+SQLITE_BUSY_TIMEOUT_MS=5000
+
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1-mini
+
+LOCAL_STORAGE_ROOT=./storage
+
+SANCTIONS_PROVIDER_BASE_URL=
+SANCTIONS_PROVIDER_API_KEY=
+NEWS_PROVIDER_BASE_URL=
+NEWS_PROVIDER_API_KEY=
+EMAIL_PROVIDER_API_KEY=
+```
+
+### `database_config.yaml`
+
+Defines database behavior that is not secret.
+
+```yaml
+database:
+  engine: sqlite
+  url_env: DATABASE_URL
+  local_file: ./data/risk_beacon.db
+  pragmas:
+    journal_mode: WAL
+    busy_timeout: 5000
+    foreign_keys: true
+  migrations:
+    tool: alembic
+    directory: apps/api/app/db/migrations
+```
+
+The actual database URL should be read from `DATABASE_URL`.
+
+### `llm_config.yaml`
+
+Defines LLM provider and model behavior. API keys must be read from environment variables.
+
+```yaml
+llm:
+  provider: openai
+  api_key_env: OPENAI_API_KEY
+  default_model_env: OPENAI_MODEL
+  default_model: gpt-4.1-mini
+  timeout_seconds: 60
+  retries: 2
+  structured_outputs: true
+  store_prompts: false
+  redact_sensitive_inputs: true
+```
+
+The LLM client should fail fast with a clear configuration error when an enabled LLM-backed agent runs without the required API key.
 
 ### `agent_config.yaml`
 
@@ -375,6 +520,23 @@ providers:
     api_key_env: NEWS_PROVIDER_API_KEY
     timeout_seconds: 15
     retries: 2
+```
+
+### `storage_config.yaml`
+
+Defines local or S3-compatible storage behavior.
+
+```yaml
+storage:
+  provider: local
+  local:
+    root_env: LOCAL_STORAGE_ROOT
+    default_root: ./storage
+  s3:
+    endpoint_url_env: S3_ENDPOINT_URL
+    bucket_env: S3_BUCKET
+    access_key_env: S3_ACCESS_KEY_ID
+    secret_key_env: S3_SECRET_ACCESS_KEY
 ```
 
 ### `scoring_policy.yaml`
