@@ -60,23 +60,50 @@ def can_access_supplier(conn, user: dict, supplier_id: str) -> bool:
         review = conn.execute(
             """
             SELECT 1 FROM review_queue_items
-            WHERE tenant_id = ? AND supplier_id = ? AND status != 'cancelled'
+            WHERE tenant_id = ? AND supplier_id = ? AND assigned_role = 'Risk Analyst' AND status = 'open'
             LIMIT 1
             """,
             (user["tenant_id"], supplier_id),
         ).fetchone()
         if review:
             return True
-    if "Approver / Risk Committee" in roles:
-        score = conn.execute(
+        completed_review = conn.execute(
             """
-            SELECT 1 FROM risk_scores
-            WHERE tenant_id = ? AND supplier_id = ?
+            SELECT 1
+            FROM suppliers s
+            JOIN review_queue_items r ON r.supplier_id = s.id AND r.tenant_id = s.tenant_id
+            WHERE s.tenant_id = ? AND s.id = ? AND s.status = 'pending_approval'
+              AND r.assigned_role = 'Risk Analyst' AND r.status = 'completed'
             LIMIT 1
             """,
             (user["tenant_id"], supplier_id),
         ).fetchone()
-        if score:
+        if completed_review:
+            return True
+    if "Approver / Risk Committee" in roles:
+        approval = conn.execute(
+            """
+            SELECT 1
+            FROM suppliers s
+            JOIN review_queue_items r ON r.supplier_id = s.id AND r.tenant_id = s.tenant_id
+            WHERE s.tenant_id = ? AND s.id = ? AND s.status = 'pending_approval'
+              AND r.assigned_role = 'Approver / Risk Committee' AND r.status = 'open'
+            LIMIT 1
+            """,
+            (user["tenant_id"], supplier_id),
+        ).fetchone()
+        if approval:
+            return True
+        prior_decision = conn.execute(
+            """
+            SELECT 1
+            FROM decisions
+            WHERE tenant_id = ? AND supplier_id = ? AND decided_by = ?
+            LIMIT 1
+            """,
+            (user["tenant_id"], supplier_id, user["id"]),
+        ).fetchone()
+        if prior_decision:
             return True
     if "Supplier Relationship Manager" in roles:
         approved = conn.execute(

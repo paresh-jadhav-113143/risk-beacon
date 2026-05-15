@@ -115,6 +115,17 @@ type AgentRun = {
   completed_at?: string;
 };
 
+type NotificationRecord = {
+  id: string;
+  supplier_id?: string;
+  type: string;
+  title: string;
+  body: string;
+  status: string;
+  severity: string;
+  created_at: string;
+};
+
 type NewSupplierForm = {
   legal_name: string;
   country: string;
@@ -199,6 +210,8 @@ export function SupplierRiskWorkspace() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Supplier | null>(null);
   const [agentRuns, setAgentRuns] = useState<AgentRun[]>([]);
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -208,6 +221,12 @@ export function SupplierRiskWorkspace() {
     if (!token) return;
     void bootstrap();
   }, [token]);
+
+  useEffect(() => {
+    if (!message) return undefined;
+    const timer = window.setTimeout(() => setMessage(""), 5500);
+    return () => window.clearTimeout(timer);
+  }, [message]);
 
   async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(`${API_BASE}${path}`, {
@@ -230,6 +249,7 @@ export function SupplierRiskWorkspace() {
       const me = await request<User>("/auth/me");
       setUser(me);
       const list = await request<Supplier[]>("/suppliers");
+      setNotifications(await request<NotificationRecord[]>("/notifications"));
       setSuppliers(list);
       const nextId = selectedId ?? list[0]?.id ?? null;
       setSelectedId(nextId);
@@ -280,9 +300,17 @@ export function SupplierRiskWorkspace() {
 
   async function refreshSupplier(id = selectedId) {
     const list = await request<Supplier[]>("/suppliers");
+    setNotifications(await request<NotificationRecord[]>("/notifications"));
     setSuppliers(list);
-    if (id) setSelected(await request<Supplier>(`/suppliers/${id}`));
-    if (id) setAgentRuns(await request<AgentRun[]>(`/agents/runs?supplier_id=${id}`));
+    const visibleId = id && list.some((supplier) => supplier.id === id) ? id : list[0]?.id;
+    setSelectedId(visibleId ?? null);
+    if (visibleId) {
+      setSelected(await request<Supplier>(`/suppliers/${visibleId}`));
+      setAgentRuns(await request<AgentRun[]>(`/agents/runs?supplier_id=${visibleId}`));
+    } else {
+      setSelected(null);
+      setAgentRuns([]);
+    }
   }
 
   async function createSupplier(payload: NewSupplierForm) {
@@ -296,6 +324,28 @@ export function SupplierRiskWorkspace() {
     } else {
       setMessage("Supplier onboarding request created.");
     }
+  }
+
+  async function markNotificationRead(notificationId: string) {
+    await request<{ ok: boolean }>(`/notifications/${notificationId}/read`, { method: "POST" });
+    setNotifications(await request<NotificationRecord[]>("/notifications"));
+  }
+
+  async function markAllNotificationsRead() {
+    await request<{ ok: boolean }>("/notifications/read-all", { method: "POST" });
+    setNotifications(await request<NotificationRecord[]>("/notifications"));
+  }
+
+  async function openNotification(notification: NotificationRecord) {
+    if (notification.status === "unread") {
+      await markNotificationRead(notification.id);
+    }
+    if (notification.supplier_id && suppliers.some((supplier) => supplier.id === notification.supplier_id)) {
+      setSelectedId(notification.supplier_id);
+      setSelected(await request<Supplier>(`/suppliers/${notification.supplier_id}`));
+      setAgentRuns(await request<AgentRun[]>(`/agents/runs?supplier_id=${notification.supplier_id}`));
+    }
+    setNotificationsOpen(false);
   }
 
   async function runAssessment() {
@@ -328,13 +378,39 @@ export function SupplierRiskWorkspace() {
 
   async function addDocument(payload: DocumentForm) {
     if (!selected) return;
-    const updated = await request<Supplier>(`/suppliers/${selected.id}/documents`, {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
-    setSelected(updated);
-    await refreshSupplier(updated.id);
-    setMessage("Document added.");
+    try {
+      const updated = await request<Supplier>(`/suppliers/${selected.id}/documents`, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      setSelected(updated);
+      await refreshSupplier(updated.id);
+      setMessage("Document added.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Document upload failed");
+    }
+  }
+
+  async function downloadDocument(document: DocumentRecord) {
+    if (!selected) return;
+    try {
+      const response = await fetch(`${API_BASE}/suppliers/${selected.id}/documents/${document.id}/download`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({ detail: response.statusText }));
+        throw new Error(body.detail ?? "Download failed");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = window.document.createElement("a");
+      anchor.href = url;
+      anchor.download = document.file_name;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Download failed");
+    }
   }
 
   async function updateProfile(payload: SupplierProfileForm) {
@@ -358,7 +434,12 @@ export function SupplierRiskWorkspace() {
     });
     setSelected(updated);
     await refreshSupplier(updated.id);
-    setMessage(`Finding ${action.replace("_", " ")} saved.`);
+    const activeFindings = updated.risk_signals?.filter((signal) => signal.status === "active").length ?? 0;
+    if (updated.status === "pending_approval" && activeFindings === 0) {
+      setMessage("All findings reviewed by Risk Analyst. Supplier routed to Approver / Risk Committee for final approval.");
+    } else {
+      setMessage(`Finding ${action.replace("_", " ")} saved. ${activeFindings} active finding${activeFindings === 1 ? "" : "s"} remaining.`);
+    }
   }
 
   if (!token || !user) {
@@ -367,11 +448,13 @@ export function SupplierRiskWorkspace() {
 
   const roles = user.roles.join(", ");
   const canCreate = user.roles.includes("Procurement Buyer") || user.roles.includes("System Administrator");
-  const canAssess = user.roles.some((role) => ["Procurement Buyer", "Risk Analyst", "System Administrator"].includes(role));
-  const canDecide = user.roles.includes("Approver / Risk Committee") || user.roles.includes("System Administrator");
-  const canUpload = user.roles.some((role) => ["Supplier Admin", "Procurement Buyer", "System Administrator"].includes(role));
-  const canEditProfile = user.roles.some((role) => ["Supplier Admin", "Procurement Buyer", "System Administrator"].includes(role));
-  const canReviewFindings = user.roles.some((role) => ["Risk Analyst", "System Administrator"].includes(role));
+  const canAssess = Boolean(selected) && selected?.status !== "approved" && selected?.status !== "rejected" && user.roles.some((role) => ["Procurement Buyer", "Risk Analyst", "System Administrator"].includes(role));
+  const canDecide = Boolean(selected) && selected?.status === "pending_approval" && (user.roles.includes("Approver / Risk Committee") || user.roles.includes("System Administrator"));
+  const canUpload = Boolean(selected) && ["pending_onboarding", "needs_information"].includes(selected?.status ?? "") && user.roles.some((role) => ["Supplier Admin", "System Administrator"].includes(role));
+  const canEditProfile = Boolean(selected) && ["pending_onboarding", "needs_information"].includes(selected?.status ?? "") && user.roles.some((role) => ["Supplier Admin", "System Administrator"].includes(role));
+  const canReviewFindings = Boolean(selected) && selected?.status === "pending_review" && user.roles.some((role) => ["Risk Analyst", "System Administrator"].includes(role));
+  const canDownloadDocuments = user.roles.some((role) => ["Supplier Admin", "Risk Analyst", "Approver / Risk Committee", "System Administrator", "Auditor"].includes(role));
+  const unreadNotificationCount = notifications.filter((notification) => notification.status === "unread").length;
 
   return (
     <div className="rb-shell">
@@ -403,13 +486,26 @@ export function SupplierRiskWorkspace() {
           </div>
           <div className="rb-top-actions">
             {canCreate ? <CreateSupplierButton onCreate={createSupplier} /> : null}
+            <NotificationBell
+              notifications={notifications}
+              open={notificationsOpen}
+              unreadCount={unreadNotificationCount}
+              onToggle={() => setNotificationsOpen((value) => !value)}
+              onOpenNotification={openNotification}
+              onMarkAllRead={markAllNotificationsRead}
+            />
             <button className="rb-icon" onClick={() => void bootstrap()} title="Refresh">
               <Database size={18} />
             </button>
           </div>
         </header>
 
-        {message ? <div className="rb-message">{message}</div> : null}
+        {message ? (
+          <div className="rb-message">
+            <span>{message}</span>
+            <button type="button" onClick={() => setMessage("")}>X</button>
+          </div>
+        ) : null}
 
         <section className="rb-grid">
           <div className="rb-panel rb-list-panel">
@@ -450,7 +546,7 @@ export function SupplierRiskWorkspace() {
                     <RiskPill level={selected.latest_score?.risk_level ?? "unscored"} score={selected.latest_score?.composite_score} large />
                   </div>
                   <div className="rb-actions">
-                    {canUpload ? <AddDocumentButton onAdd={addDocument} /> : null}
+                    {canUpload ? <AddDocumentButton documents={selected.documents ?? []} onAdd={addDocument} /> : null}
                     {canAssess ? <button onClick={runAssessment} disabled={loading}><Play size={16} /> Run assessment</button> : null}
                     {canDecide ? (
                       <>
@@ -495,6 +591,11 @@ export function SupplierRiskWorkspace() {
                         <strong>{document.document_type}</strong>
                         <span>{document.file_name}</span>
                         <small>{document.status}</small>
+                        {canDownloadDocuments ? (
+                          <div className="rb-inline-actions">
+                            <button onClick={() => void downloadDocument(document)}>Download</button>
+                          </div>
+                        ) : null}
                       </div>
                     ))}
                     {selected.extracted_fields?.length ? (
@@ -643,24 +744,79 @@ function CreateSupplierButton({ onCreate }: { onCreate: (payload: NewSupplierFor
   );
 }
 
-function AddDocumentButton({ onAdd }: { onAdd: (payload: DocumentForm) => Promise<void> }) {
+function NotificationBell({
+  notifications,
+  open,
+  unreadCount,
+  onToggle,
+  onOpenNotification,
+  onMarkAllRead
+}: {
+  notifications: NotificationRecord[];
+  open: boolean;
+  unreadCount: number;
+  onToggle: () => void;
+  onOpenNotification: (notification: NotificationRecord) => Promise<void>;
+  onMarkAllRead: () => Promise<void>;
+}) {
+  return (
+    <div className="rb-notifications">
+      <button className="rb-icon rb-bell" onClick={onToggle} title="Notifications">
+        <Bell size={18} />
+        {unreadCount ? <span>{unreadCount}</span> : null}
+      </button>
+      {open ? (
+        <section className="rb-notification-menu">
+          <div className="rb-notification-head">
+            <strong>Notifications</strong>
+            {unreadCount ? <button onClick={() => void onMarkAllRead()}>Mark all read</button> : null}
+          </div>
+          <div className="rb-notification-list">
+            {notifications.length ? notifications.slice(0, 8).map((notification) => (
+              <button
+                key={notification.id}
+                className={`rb-notification ${notification.status === "unread" ? "unread" : ""}`}
+                onClick={() => void onOpenNotification(notification)}
+              >
+                <strong>{notification.title}</strong>
+                <span>{notification.body}</span>
+                <small>{new Date(notification.created_at).toLocaleString()}</small>
+              </button>
+            )) : <p className="rb-empty">No notifications yet.</p>}
+          </div>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function AddDocumentButton({ documents, onAdd }: { documents: DocumentRecord[]; onAdd: (payload: DocumentForm) => Promise<void> }) {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<DocumentForm>({ document_type: "business_registration", file_name: "" });
+  const availableDocumentTypes = documentTypeOptions.filter((documentType) => !documents.some((document) => document.document_type === documentType.value && !["replaced", "archived"].includes(document.status)));
+  const defaultDocumentType = availableDocumentTypes[0]?.value ?? "";
+  const [form, setForm] = useState<DocumentForm>({ document_type: defaultDocumentType, file_name: "" });
+
+  useEffect(() => {
+    if (!availableDocumentTypes.some((documentType) => documentType.value === form.document_type)) {
+      setForm((current) => ({ ...current, document_type: defaultDocumentType }));
+    }
+  }, [defaultDocumentType, documents.length]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (!form.document_type) return;
     await onAdd(form);
     setOpen(false);
-    setForm({ document_type: "business_registration", file_name: "" });
+    setForm({ document_type: defaultDocumentType, file_name: "" });
   }
 
   return (
     <div className="rb-create">
-      <button type="button" onClick={() => setOpen((value) => !value)}><FileText size={16} /> Add document</button>
+      <button type="button" onClick={() => setOpen((value) => !value)} disabled={!availableDocumentTypes.length}><FileText size={16} /> Add document</button>
       {open ? (
         <form className="rb-popover" onSubmit={submit}>
           <select value={form.document_type} onChange={(event) => setForm({ ...form, document_type: event.target.value })} required>
-            {documentTypeOptions.map((documentType) => <option key={documentType.value} value={documentType.value}>{documentType.label}</option>)}
+            {availableDocumentTypes.map((documentType) => <option key={documentType.value} value={documentType.value}>{documentType.label}</option>)}
           </select>
           <input placeholder="File name" value={form.file_name} onChange={(event) => setForm({ ...form, file_name: event.target.value })} required />
           <button>Add document</button>

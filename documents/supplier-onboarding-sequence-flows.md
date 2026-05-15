@@ -41,6 +41,7 @@ The MVP assumes:
   "in_assessment",
   "needs_information",
   "in_review",
+  "pending_approval",
   "enhanced_due_diligence",
   "approved",
   "rejected",
@@ -55,6 +56,7 @@ The MVP assumes:
   "draft",
   "pending_onboarding",
   "pending_review",
+  "pending_approval",
   "approved",
   "rejected",
   "archived"
@@ -93,7 +95,7 @@ This is the standard successful onboarding sequence.
 | 11 | Scoring Agent | Scoring starts | Calculate category scores, composite score, and risk level from persisted risk signals | Recommendation Agent |
 | 12 | Recommendation Agent | Recommendation starts | Create advisory recommendation with evidence-linked rationale | Human Review Agent |
 | 13 | Human Review Agent | Review packet generation starts | Create review packet and route to correct reviewer or approver | Risk Analyst |
-| 14 | Risk Analyst | Analyst reviews findings | Accept, dismiss, comment on findings, or request supplier clarification if needed | Approver / Risk Committee |
+| 14 | Risk Analyst | Analyst reviews findings | Accept, dismiss, comment on findings, or request supplier clarification if needed; when all active findings are resolved, close Risk Analyst queue item, set supplier and onboarding status to `pending_approval`, notify buyer, and create Approver queue item | Approver / Risk Committee |
 | 15 | Approver / Risk Committee | Approver reviews packet | Make final approve decision with reason | Notification Agent |
 | 16 | Notification Agent | Final decision notification starts | Notify buyer and supplier, update supplier status to approved, write audit events | Workflow complete |
 
@@ -620,6 +622,7 @@ The application should always make the next actionable owner clear.
 | Financial finding unresolved | Risk Analyst |
 | ESG finding unresolved | Risk Analyst |
 | Cyber finding unresolved | Risk Analyst |
+| All active findings accepted or dismissed | Approver / Risk Committee |
 | Final decision pending | Approver / Risk Committee |
 | Supplier approved and monitoring enabled | Monitoring Agent |
 | Monitoring threshold crossed | Supplier Relationship Manager or Risk Analyst |

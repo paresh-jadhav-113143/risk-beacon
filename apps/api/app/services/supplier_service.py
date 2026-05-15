@@ -22,8 +22,8 @@ def list_suppliers(conn, user: dict) -> list[dict]:
             """
             SELECT DISTINCT s.*
             FROM suppliers s
-            LEFT JOIN review_queue_items r ON r.supplier_id = s.id AND r.tenant_id = s.tenant_id
-            WHERE s.tenant_id = ? AND (r.id IS NOT NULL OR s.status IN ('pending_review', 'approved'))
+            JOIN review_queue_items r ON r.supplier_id = s.id AND r.tenant_id = s.tenant_id
+            WHERE s.tenant_id = ? AND r.assigned_role = 'Risk Analyst' AND r.status = 'open'
             ORDER BY s.created_at DESC
             """,
             (tenant_id,),
@@ -33,9 +33,10 @@ def list_suppliers(conn, user: dict) -> list[dict]:
             """
             SELECT DISTINCT s.*
             FROM suppliers s
-            JOIN risk_scores rs ON rs.supplier_id = s.id AND rs.tenant_id = s.tenant_id
-            WHERE s.tenant_id = ?
-            ORDER BY rs.calculated_at DESC
+            JOIN review_queue_items r ON r.supplier_id = s.id AND r.tenant_id = s.tenant_id
+            WHERE s.tenant_id = ? AND r.assigned_role = 'Approver / Risk Committee' AND r.status = 'open'
+              AND s.status = 'pending_approval'
+            ORDER BY r.created_at DESC
             """,
             (tenant_id,),
         ).fetchall()
