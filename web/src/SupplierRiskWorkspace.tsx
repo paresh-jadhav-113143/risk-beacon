@@ -251,7 +251,7 @@ export function SupplierRiskWorkspace() {
       const list = await request<Supplier[]>("/suppliers");
       setNotifications(await request<NotificationRecord[]>("/notifications"));
       setSuppliers(list);
-      const nextId = selectedId ?? list[0]?.id ?? null;
+      const nextId = selectedId && list.some((supplier) => supplier.id === selectedId) ? selectedId : list[0]?.id ?? null;
       setSelectedId(nextId);
       if (nextId) {
         setSelected(await request<Supplier>(`/suppliers/${nextId}`));
@@ -295,7 +295,11 @@ export function SupplierRiskWorkspace() {
     setToken("");
     setUser(null);
     setSuppliers([]);
+    setSelectedId(null);
     setSelected(null);
+    setAgentRuns([]);
+    setNotifications([]);
+    setNotificationsOpen(false);
   }
 
   async function refreshSupplier(id = selectedId) {
